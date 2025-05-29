@@ -172,7 +172,7 @@ jobs:
         docker tag "${FULL_IMAGE_NAME}:${VERSION}" "${LOCAL_IMAGE_NAME}:${VERSION}"
         
         echo "Loading image into kind cluster"
-        kind load docker-image "${LOCAL_IMAGE_NAME}:${VERSION}"
+        kind load docker-image "${LOCAL_IMAGE_NAME}:${VERSION}" --name kind
         
         # Deploy with helm using the local image name
         helm upgrade --install web-app demo/package/charts/web-app \
