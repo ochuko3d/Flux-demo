@@ -1,13 +1,9 @@
 replicaCount: 1
 
 image:
-  repository: ghcr.io/your-username/web-app  # Replace with your registry/username
-  # Specify version using semantic versioning (e.g., 1.2.3)
-  tag: "1.2.3"
-  # You can override with specific versions like "1.2.3" or git SHA
-  pullPolicy: IfNotPresent
-  pullSecrets:
-    - name: "registry-credentials"    # Replace with your registry secret name
+  repository: nginx-web-app  # Will be overridden by helm command
+  tag: "latest"             # Will be overridden by helm command
+  pullPolicy: IfNotPresent  # Will be overridden to Never for local deployment
 
 security:
   podSecurityContext:

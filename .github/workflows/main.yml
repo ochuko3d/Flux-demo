@@ -150,11 +150,22 @@ jobs:
 
     - name: Deploy to local cluster
       run: |
+        # First retag the image without registry prefix for kind
+        docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.version.outputs.version }}
+        docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.version.outputs.version }} ${{ env.IMAGE_NAME }}:${{ needs.version.outputs.version }}
+        
+        # Load the image into kind cluster
+        kind load docker-image ${{ env.IMAGE_NAME }}:${{ needs.version.outputs.version }}
+        
+        # Deploy with helm using the local image name
         helm upgrade --install web-app demo/package/charts/web-app \
-          --set image.repository=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }} \
+          --set image.repository=${{ env.IMAGE_NAME }} \
           --set image.tag=${{ needs.version.outputs.version }} \
+          --set image.pullPolicy=Never \
           --debug --wait --timeout 10m
         
         # Check pod status
-        kubectl get pods -l app.kubernetes.io/name=web-app
+        echo "Checking pod status..."
+        kubectl get pods -l app.kubernetes.io/name=web-app -o wide
+        echo "Pod details:"
         kubectl describe pods -l app.kubernetes.io/name=web-app
