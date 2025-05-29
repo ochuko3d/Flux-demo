@@ -84,6 +84,7 @@ jobs:
         vuln-type: 'os,library'
         severity: 'CRITICAL,HIGH'
         platform: linux/amd64
+        trivyignores: 'demo/image/.trivyignore'
 
   validate-helm:
     runs-on: ubuntu-latest
