@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "web-app.fullname" . }}-config
+  labels:
+    {{- include "web-app.labels" . | nindent 4 }}
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html>
+    <body>
+        <h1>{{ .Values.configMap.message }}</h1>
+    </body>
+    </html>
