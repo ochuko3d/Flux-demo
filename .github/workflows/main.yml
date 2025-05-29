@@ -9,10 +9,31 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: nginx-web-app  # Change this to your image name
-  VERSION: 1.2.3  # Change this for new releases
 
 jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.get_version.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Get Version
+        id: get_version
+        run: |
+          # If this is a tag, use the tag name
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          else
+            # Otherwise use commit sha with date
+            echo "version=$(date +'%Y%m%d')-${GITHUB_SHA::8}" >> $GITHUB_OUTPUT
+          fi
+
   build-and-test:
+    needs: version
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -21,6 +42,8 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
+
+
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v2
@@ -35,10 +58,10 @@ jobs:
     - name: Build and push Docker image
       uses: docker/build-push-action@v4
       with:
-        context: ./image
+        context: image
         push: ${{ github.event_name != 'pull_request' }}
         tags: |
-          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.VERSION }}
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.version.outputs.version }}
           ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
           ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
         cache-from: type=gha
@@ -102,5 +125,5 @@ jobs:
       run: |
         helm upgrade --install web-app ./package/charts/web-app \
           --set image.repository=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }} \
-          --set image.tag=${{ env.VERSION }} \
+          --set image.tag=${{ needs.version.outputs.version }} \
           --wait --timeout 5m
