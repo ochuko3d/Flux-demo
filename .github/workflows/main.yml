@@ -8,7 +8,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  IMAGE_NAME: ${{ github.repository | toLowerCase }}
   VERSION: 1.2.3  # Change this for new releases
 
 jobs:
