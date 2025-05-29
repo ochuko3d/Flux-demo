@@ -119,12 +119,12 @@ jobs:
 
     - name: Lint Helm Chart
       run: |
-        cd package/charts/web-app
+        cd demo/package/charts/web-app
         helm lint .
 
     - name: Validate Kubernetes manifests
       run: |
-        cd package/charts/web-app
+        cd demo/package/charts/web-app
         helm template . | kubeval --strict
 
   deploy-local:
