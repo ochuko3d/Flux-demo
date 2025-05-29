@@ -10,6 +10,6 @@ RUN mkdir -p /var/cache/nginx/client_temp && \
 # Use the non-root nginx user that comes with official image
 USER nginx
 
-EXPOSE 80
+EXPOSE 8080
 
 CMD ["nginx", "-g", "daemon off;"]
