@@ -16,6 +16,7 @@ spec:
     spec:
       # Pod-level security context
       securityContext:
+        runAsUser: 101  
         runAsNonRoot: true
       {{- with .Values.image.pullSecrets }}
       imagePullSecrets:
