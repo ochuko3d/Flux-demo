@@ -150,7 +150,7 @@ jobs:
 
     - name: Deploy to local cluster
       run: |
-        helm upgrade --install web-app .demo/package/charts/web-app \
+        helm upgrade --install web-app demo/package/charts/web-app \
           --set image.repository=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }} \
           --set image.tag=${{ needs.version.outputs.version }} \
           --wait --timeout 5m
