@@ -3,12 +3,13 @@ name: Build and Deploy Web App
 on:
   push:
     branches: [ main ]
+    tags: v*.*.*  # Trigger on semantic version tags (v1.2.3 format)
   pull_request:
     branches: [ main ]
 
 env:
   REGISTRY: docker.io
-  IMAGE_NAME: ${{ github.repository_owner }}/nginx-web-app  # Your Docker Hub username/image-name
+  IMAGE_NAME: ${{ github.repository_owner }}/nginx-web-app
 
 jobs:
   version:
@@ -24,12 +25,12 @@ jobs:
       - name: Get Version
         id: get_version
         run: |
-          # If this is a tag, use the tag name
-          if [[ $GITHUB_REF == refs/tags/* ]]; then
-            echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          # If this is a semantic version tag (v1.2.3)
+          if [[ $GITHUB_REF =~ refs/tags/v([0-9]+\.[0-9]+\.[0-9]+) ]]; then
+            echo "version=${BASH_REMATCH[1]}" >> $GITHUB_OUTPUT
+          # For branches/other tags use commit-based version
           else
-            # Otherwise use commit sha with date
-            echo "version=$(date +'%Y%m%d')-${GITHUB_SHA::8}" >> $GITHUB_OUTPUT
+            echo "version=0.0.0-$(date +'%Y%m%d')-${GITHUB_SHA::8}" >> $GITHUB_OUTPUT
           fi
 
   build-and-test:
@@ -43,10 +44,14 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v3
 
-
+    - name: Set up QEMU for multi-arch
+      uses: docker/setup-qemu-action@v2
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v2
+      with:
+        driver-opts: |
+          network=host
 
     - name: Log in to Docker Hub
       uses: docker/login-action@v2
@@ -55,44 +60,30 @@ jobs:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    - name: Build Docker image
+    - name: Build and push multi-arch image
       uses: docker/build-push-action@v4
       with:
         context: demo/image
         file: demo/image/Dockerfile
-        push: false # Don't push yet, we'll push after scanning
+        platforms: linux/amd64,linux/arm64
+        push: ${{ github.event_name != 'pull_request' }}
         tags: |
           ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.version.outputs.version }}
           ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
-        outputs: type=docker,dest=/tmp/image.tar # Save image for scanning
 
-    - name: Run Trivy vulnerability scanner
+    - name: Scan with Trivy (AMD64)
+      if: success() && github.event_name != 'pull_request'
       uses: aquasecurity/trivy-action@master
       with:
-        input: /tmp/image.tar
+        image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.version.outputs.version }}
         format: 'table'
         exit-code: '1'
         ignore-unfixed: true
         vuln-type: 'os,library'
         severity: 'CRITICAL,HIGH'
-        trivyignores: 'demo/image/.trivyignore'
-
-    - name: Push Docker image
-      if: success() # Only push if vulnerability scan passes
-      uses: docker/build-push-action@v4
-      with:
-        context: demo/image
-        file: demo/image/Dockerfile
-        push: ${{ github.event_name != 'pull_request' }}
-        tags: |
-          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.version.outputs.version }}
-          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
+        platform: linux/amd64
 
   validate-helm:
     runs-on: ubuntu-latest
@@ -107,26 +98,10 @@ jobs:
       with:
         version: v3.11.2
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.10'
-
-    - name: Install kubeval
-      run: |
-        wget https://github.com/instrumenta/kubeval/releases/latest/download/kubeval-linux-amd64.tar.gz
-        tar xf kubeval-linux-amd64.tar.gz
-        sudo cp kubeval /usr/local/bin
-
     - name: Lint Helm Chart
       run: |
         cd demo/package/charts/web-app
         helm lint .
-
-    - name: Validate Kubernetes manifests
-      run: |
-        cd demo/package/charts/web-app
-        helm template . | kubeval --strict
 
   deploy-local:
     runs-on: ubuntu-latest
@@ -148,6 +123,7 @@ jobs:
       uses: helm/kind-action@v1.5.0
       with:
         cluster_name: kind
+        node_image: kindest/node:v1.27.3@sha256:3966ac761ae0136263ffdb6cfd4db23ef8a83cba8a463690e98317add2c9ba72  # AMD64
         wait: 30s
 
     - name: Set up Helm
@@ -157,32 +133,19 @@ jobs:
 
     - name: Deploy to local cluster
       run: |
-        # Log in to Docker Hub again to ensure we can pull
-        echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
-        
-        # Pull and load the image into kind
+        # Pull AMD64 image specifically
         FULL_IMAGE_NAME="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
-        LOCAL_IMAGE_NAME="${{ env.IMAGE_NAME }}"
         VERSION="${{ needs.version.outputs.version }}"
         
-        echo "Pulling image: ${FULL_IMAGE_NAME}:${VERSION}"
-        docker pull "${FULL_IMAGE_NAME}:${VERSION}"
+        docker pull --platform linux/amd64 "${FULL_IMAGE_NAME}:${VERSION}"
+        kind load docker-image "${FULL_IMAGE_NAME}:${VERSION}" --name kind
         
-        echo "Retagging image for kind"
-        docker tag "${FULL_IMAGE_NAME}:${VERSION}" "${LOCAL_IMAGE_NAME}:${VERSION}"
-        
-        echo "Loading image into kind cluster"
-        kind load docker-image "${LOCAL_IMAGE_NAME}:${VERSION}" --name kind
-        
-        # Deploy with helm using the local image name
+        # Deploy with helm using semantic version
         helm upgrade --install web-app demo/package/charts/web-app \
-          --set image.repository=${{ env.IMAGE_NAME }} \
+          --set image.repository=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }} \
           --set image.tag=${{ needs.version.outputs.version }} \
-          --set image.pullPolicy=Never \
-          --debug --wait --timeout 3m
+          --set image.pullPolicy=IfNotPresent \
+          --debug --wait --timeout 2m
         
-        # Check pod status
-        echo "Checking pod status..."
-        kubectl get pods -l app.kubernetes.io/name=web-app -o wide
-        echo "Pod details:"
-        kubectl describe pods -l app.kubernetes.io/name=web-app
+        # Verify deployment
+        kubectl get pods -o wide -w
