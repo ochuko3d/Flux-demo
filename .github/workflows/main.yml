@@ -130,8 +130,12 @@ jobs:
 
   deploy-local:
     runs-on: ubuntu-latest
-    needs: validate-helm
+    needs: [validate-helm, version]
     if: github.event_name != 'pull_request'
+    environment: production
+    permissions:
+      contents: read
+      packages: write
     
     steps:
     - name: Checkout repository
@@ -150,12 +154,22 @@ jobs:
 
     - name: Deploy to local cluster
       run: |
-        # First retag the image without registry prefix for kind
-        docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.version.outputs.version }}
-        docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.version.outputs.version }} ${{ env.IMAGE_NAME }}:${{ needs.version.outputs.version }}
+        # Log in to Docker Hub again to ensure we can pull
+        echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
         
-        # Load the image into kind cluster
-        kind load docker-image ${{ env.IMAGE_NAME }}:${{ needs.version.outputs.version }}
+        # Pull and load the image into kind
+        FULL_IMAGE_NAME="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
+        LOCAL_IMAGE_NAME="${{ env.IMAGE_NAME }}"
+        VERSION="${{ needs.version.outputs.version }}"
+        
+        echo "Pulling image: ${FULL_IMAGE_NAME}:${VERSION}"
+        docker pull "${FULL_IMAGE_NAME}:${VERSION}"
+        
+        echo "Retagging image for kind"
+        docker tag "${FULL_IMAGE_NAME}:${VERSION}" "${LOCAL_IMAGE_NAME}:${VERSION}"
+        
+        echo "Loading image into kind cluster"
+        kind load docker-image "${LOCAL_IMAGE_NAME}:${VERSION}"
         
         # Deploy with helm using the local image name
         helm upgrade --install web-app demo/package/charts/web-app \
