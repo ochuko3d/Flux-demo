@@ -176,7 +176,7 @@ jobs:
           --set image.repository=${{ env.IMAGE_NAME }} \
           --set image.tag=${{ needs.version.outputs.version }} \
           --set image.pullPolicy=Never \
-          --debug --wait --timeout 10m
+          --debug --wait --timeout 3m
         
         # Check pod status
         echo "Checking pod status..."
