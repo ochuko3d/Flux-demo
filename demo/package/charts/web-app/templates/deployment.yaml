@@ -15,10 +15,13 @@ spec:
         {{- include "web-app.selectorLabels" . | nindent 8 }}
     spec:
       # Pod-level security context
+      {{- if .Values.podSecurityContext.enabled }}
       securityContext:
-        runAsUser: 101  
-        runAsNonRoot: true
-        fsGroup: 101
+        runAsUser: {{ .Values.podSecurityContext.runAsUser }}
+        runAsGroup: {{ .Values.podSecurityContext.runAsGroup }}
+        fsGroup: {{ .Values.podSecurityContext.fsGroup }}
+      {{- end }}
+
       {{- with .Values.image.pullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -28,32 +31,35 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           # Container security context
+          {{- if .Values.containerSecurityContext.enabled }}
           securityContext:
-            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: {{ .Values.containerSecurityContext.readOnlyRootFilesystem }}
+            allowPrivilegeEscalation: {{ .Values.containerSecurityContext.allowPrivilegeEscalation }}
             capabilities:
-              add: ["NET_BIND_SERVICE"]  # Allow binding to privileged ports
-              drop: ["ALL"]
+              add: {{ toYaml .Values.containerSecurityContext.capabilities.add | nindent 14 }}
+              drop: {{ toYaml .Values.containerSecurityContext.capabilities.drop | nindent 14 }}
+          {{- end }}
           # Resource limits
           resources:
             limits:
-              cpu: "500m"
-              memory: "512Mi"
+              cpu: "{{ .Values.resources.limits.cpu }}"
+              memory: "{{ .Values.resources.limits.memory }}"
             requests:
-              cpu: "200m"
-              memory: "256Mi"
+              cpu: "{{ .Values.resources.requests.cpu }}"
+              memory: "{{ .Values.resources.requests.memory }}"
           # Health checks
           livenessProbe:
             httpGet:
               path: /
               port: 80
-            initialDelaySeconds: 10
-            periodSeconds: 10
+            initialDelaySeconds: {{ .Values.probes.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.livenessProbe.periodSeconds }}
           readinessProbe:
             httpGet:
               path: /
               port: 80
-            initialDelaySeconds: 5
-            periodSeconds: 5
+            initialDelaySeconds: {{ .Values.probes.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.readinessProbe.periodSeconds }}
           ports:
             - containerPort: 80
               protocol: TCP
@@ -61,6 +67,7 @@ spec:
             - name: config-volume
               mountPath: /usr/share/nginx/html/index.html
               subPath: index.html
+              readOnly: true
             - name: tmp-volume
               mountPath: /tmp
       volumes:

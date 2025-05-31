@@ -1,6 +1,4 @@
-{{/*
-Expand the name of the chart.
-*/}}
+{{/*Expand the name of the chart.*/}}
 {{- define "web-app.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
 {{- end }}
@@ -23,16 +21,12 @@ If release name contains chart name it will be used as a full name.
 {{- end }}
 {{- end }}
 
-{{/*
-Create chart name and version as used by the chart label.
-*/}}
+{{/*Create chart name and version as used by the chart label.*/}}
 {{- define "web-app.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
-{{/*
-Common labels
-*/}}
+{{/*Common labels*/}}
 {{- define "web-app.labels" -}}
 helm.sh/chart: {{ include "web-app.chart" . }}
 {{ include "web-app.selectorLabels" . }}
