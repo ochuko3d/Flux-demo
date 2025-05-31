@@ -56,5 +56,6 @@ ingress:
   #    hosts:
   #      - chart-example.local
 
-configMap:
-  message: "This is prod"
+nginx:
+  configMap:
+    message: "This is prod"
