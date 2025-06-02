@@ -17,8 +17,8 @@ jobs:
   version:
     runs-on: ubuntu-latest
     outputs:
-      helm_version: ${{ steps.get_versions.outputs.helm_version }}
-      docker_version: ${{ steps.get_versions.outputs.docker_version }}
+      helm_version: ${{ steps.get_version.outputs.helm_version }}
+      docker_version: ${{ steps.get_version.outputs.docker_version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -138,7 +138,6 @@ jobs:
         FULL_IMAGE_NAME="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
         VERSION="${{ needs.version.outputs.docker_version }}"
         
-        docker pull --platform linux/amd64 "${FULL_IMAGE_NAME}:${VERSION}"
         kind load docker-image "${FULL_IMAGE_NAME}:${VERSION}" --name kind
         
         helm upgrade --install web-app ${{ env.HELM_CHART_PATH }} \
@@ -149,3 +148,28 @@ jobs:
           --debug --wait --timeout 2m
         
         kubectl get pods -o wide -w
+  tag_repository:
+    needs: version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check if tag exists
+        id: check_tag
+        run: |
+          if git rev-parse -q --verify "refs/tags/v${{ needs.version.outputs.helm_version }}"; then
+            echo "tag_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "tag_exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Git tag
+        if: steps.check_tag.outputs.tag_exists == 'false' && github.event_name == 'push'
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git tag -a "v${{ needs.version.outputs.helm_version }}" -m "Release v${{ needs.version.outputs.helm_version }}"
+          git push origin "v${{ needs.version.outputs.helm_version }}"
