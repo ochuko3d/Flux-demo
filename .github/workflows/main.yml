@@ -79,7 +79,7 @@ jobs:
       uses: aquasecurity/trivy-action@master
       with:
         image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.version.outputs.docker_version }}
-        format: 'sarif'
+        format: 'table'
         exit-code: ${{ github.event_name == 'push' && '1' || '0' }}
         ignore-unfixed: true
         vuln-type: 'os,library'
