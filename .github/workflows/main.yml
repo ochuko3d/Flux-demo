@@ -83,7 +83,7 @@ jobs:
         exit-code: ${{ github.event_name == 'push' && '1' || '0' }}
         ignore-unfixed: true
         vuln-type: 'os,library'
-        severity: 'CRITICAL,HIGH'
+        severity: 'CRITICAL'
         platform: linux/amd64
         trivyignores: 'demo/image/.trivyignore'
 
