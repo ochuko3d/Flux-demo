@@ -154,14 +154,6 @@ jobs:
     permissions:
       contents: write  # Required to push tags
     steps:
-      - name: Verify version output
-        run: |
-          if [ -z "${{ needs.version.outputs.helm_version }}" ]; then
-            echo "Error: helm_version is empty"
-            exit 1
-          fi
-          echo "Creating tag for version: v${{ needs.version.outputs.helm_version }}"
-
       - name: Checkout repo
         uses: actions/checkout@v4
         with:
@@ -171,29 +163,18 @@ jobs:
       - name: Check if tag exists
         id: check_tag
         run: |
-          set -e  # Exit immediately if any command fails
           if git rev-parse -q --verify "refs/tags/v${{ needs.version.outputs.helm_version }}"; then
             echo "tag_exists=true" >> $GITHUB_OUTPUT
-            echo "Tag v${{ needs.version.outputs.helm_version }} already exists"
           else
             echo "tag_exists=false" >> $GITHUB_OUTPUT
-            echo "Tag v${{ needs.version.outputs.helm_version }} does not exist"
           fi
 
       - name: Create and push Git tag
         if: steps.check_tag.outputs.tag_exists == 'false'
         run: |
-          set -e  # Exit immediately if any command fails
-          echo "Creating and pushing tag v${{ needs.version.outputs.helm_version }}"
-          
-          # Configure git
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
-          
-          # Create lightweight tag (change to -a for annotated tag if needed)
-          git tag "v${{ needs.version.outputs.helm_version }}" -m "Release v${{ needs.version.outputs.helm_version }}"
-          
-          # Push tag
+          git tag -a "v${{ needs.version.outputs.helm_version }}" -m "Release v${{ needs.version.outputs.helm_version }}"
           git push origin "v${{ needs.version.outputs.helm_version }}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITH_TOKEN }}
