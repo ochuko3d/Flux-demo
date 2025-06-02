@@ -76,7 +76,7 @@ jobs:
 
     - name: Scan with Trivy (AMD64)
       if: success() && github.event_name != 'pull_request'
-      uses: aquasecurity/trivy-action@master
+      uses: aquasecurity/trivy-action@v0.30.0
       with:
         image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.version.outputs.docker_version }}
         format: 'sarif'
@@ -138,6 +138,7 @@ jobs:
         FULL_IMAGE_NAME="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
         VERSION="${{ needs.version.outputs.docker_version }}"
         
+        docker pull --platform linux/amd64 "${FULL_IMAGE_NAME}:${VERSION}"
         kind load docker-image "${FULL_IMAGE_NAME}:${VERSION}" --name kind
         
         helm upgrade --install web-app ${{ env.HELM_CHART_PATH }} \
@@ -145,7 +146,7 @@ jobs:
           --set image.tag=${{ needs.version.outputs.docker_version }} \
           --set image.pullPolicy=IfNotPresent \
           --version ${{ needs.version.outputs.helm_version }} \
-          --debug --wait --timeout 2m
+          --debug --wait --timeout 1m
         
         kubectl get pods -o wide -w
   tag_repository:
