@@ -29,7 +29,7 @@ jobs:
         id: get_version
         run: |
           HELM_VERSION=$(grep '^version:' ${{ env.HELM_CHART_PATH }}/Chart.yaml | awk '{print $2}')
-          DOCKER_VERSION=$(grep '^appVersion:' ${{ env.HELM_CHART_PATH }}/Chart.yaml | awk '{print $2}')
+          DOCKER_VERSION=$(grep '^appVersion:' ${{ env.HELM_CHART_PATH }}/Chart.yaml | awk '{print $2}' | tr -d '"' )
           echo "helm_version=${HELM_VERSION}" >> $GITHUB_OUTPUT
           echo "docker_version=${DOCKER_VERSION}" >> $GITHUB_OUTPUT
           echo "Helm version: ${HELM_VERSION}, Docker version: ${DOCKER_VERSION}"
@@ -149,28 +149,3 @@ jobs:
           --debug --wait --timeout 2m
         
         kubectl get pods -o wide -w
-  tag_repository:
-    needs: version
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Check if tag exists
-        id: check_tag
-        run: |
-          if git rev-parse -q --verify "refs/tags/v${{ needs.version.outputs.helm_version }}"; then
-            echo "tag_exists=true" >> $GITHUB_OUTPUT
-          else
-            echo "tag_exists=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Create Git tag
-        if: steps.check_tag.outputs.tag_exists == 'false' && github.event_name == 'push'
-        run: |
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "actions@github.com"
-          git tag -a "v${{ needs.version.outputs.helm_version }}" -m "Release v${{ needs.version.outputs.helm_version }}"
-          git push origin "v${{ needs.version.outputs.helm_version }}"
