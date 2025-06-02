@@ -3,19 +3,22 @@ name: Build and Deploy Web App
 on:
   push:
     branches: [ main ]
-    tags: v1.2.3 # Trigger on semantic version tags (v1.2.3 format)
   pull_request:
     branches: [ main ]
+  release:
+    types: [created]
 
 env:
   REGISTRY: docker.io
   IMAGE_NAME: ${{ github.repository_owner }}/nginx-web-app
+  HELM_CHART_PATH: demo/package/charts/web-app
 
 jobs:
   version:
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.get_version.outputs.version }}
+      helm_version: ${{ steps.get_versions.outputs.helm_version }}
+      docker_version: ${{ steps.get_versions.outputs.docker_version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -25,13 +28,11 @@ jobs:
       - name: Get Version
         id: get_version
         run: |
-          # If this is a semantic version tag (v1.2.3)
-          if [[ $GITHUB_REF =~ refs/tags/v([0-9]+\.[0-9]+\.[0-9]+) ]]; then
-            echo "version=${BASH_REMATCH[1]}" >> $GITHUB_OUTPUT
-          # For branches/other tags use commit-based version
-          else
-            echo "version=0.0.0-$(date +'%Y%m%d')-${GITHUB_SHA::8}" >> $GITHUB_OUTPUT
-          fi
+          HELM_VERSION=$(grep '^version:' ${{ env.HELM_CHART_PATH }}/Chart.yaml | awk '{print $2}')
+          DOCKER_VERSION=$(grep '^appVersion:' ${{ env.HELM_CHART_PATH }}/Chart.yaml | awk '{print $2}')
+          echo "helm_version=${HELM_VERSION}" >> $GITHUB_OUTPUT
+          echo "docker_version=${DOCKER_VERSION}" >> $GITHUB_OUTPUT
+          echo "Helm version: ${HELM_VERSION}, Docker version: ${DOCKER_VERSION}"
 
   build-and-test:
     needs: version
@@ -68,7 +69,7 @@ jobs:
         platforms: linux/amd64,linux/arm64
         push: ${{ github.event_name != 'pull_request' }}
         tags: |
-          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.version.outputs.version }}
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.version.outputs.docker_version }}
           ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
         cache-from: type=gha
         cache-to: type=gha,mode=max
@@ -77,7 +78,7 @@ jobs:
       if: success() && github.event_name != 'pull_request'
       uses: aquasecurity/trivy-action@master
       with:
-        image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.version.outputs.version }}
+        image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.extract_versions.outputs.docker_version }}
         format: 'sarif'
         exit-code: ${{ github.event_name == 'push' && '1' || '0' }}
         ignore-unfixed: true
@@ -101,7 +102,7 @@ jobs:
 
     - name: Lint Helm Chart
       run: |
-        cd demo/package/charts/web-app
+        cd ${{ env.HELM_CHART_PATH }}
         helm lint .
 
   deploy-local:
@@ -134,19 +135,42 @@ jobs:
 
     - name: Deploy to local cluster
       run: |
-        # Pull AMD64 image specifically
         FULL_IMAGE_NAME="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
-        VERSION="${{ needs.version.outputs.version }}"
+        VERSION="${{ needs.version.outputs.docker_version }}"
         
         docker pull --platform linux/amd64 "${FULL_IMAGE_NAME}:${VERSION}"
         kind load docker-image "${FULL_IMAGE_NAME}:${VERSION}" --name kind
         
-        # Deploy with helm using semantic version
-        helm upgrade --install web-app demo/package/charts/web-app \
+        helm upgrade --install web-app ${{ env.HELM_CHART_PATH }} \
           --set image.repository=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }} \
-          --set image.tag=${{ needs.version.outputs.version }} \
+          --set image.tag=${{ needs.version.outputs.docker_version }} \
           --set image.pullPolicy=IfNotPresent \
+          --version ${{ needs.version.outputs.helm_version }} \
           --debug --wait --timeout 2m
         
-        # Verify deployment
         kubectl get pods -o wide -w
+  tag_repository:
+    needs: version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check if tag exists
+        id: check_tag
+        run: |
+          if git rev-parse -q --verify "refs/tags/v${{ needs.version.outputs.helm_version }}"; then
+            echo "tag_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "tag_exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Git tag
+        if: steps.check_tag.outputs.tag_exists == 'false' && github.event_name == 'push'
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git tag -a "v${{ needs.version.outputs.helm_version }}" -m "Release v${{ needs.version.outputs.helm_version }}"
+          git push origin "v${{ needs.version.outputs.helm_version }}"
