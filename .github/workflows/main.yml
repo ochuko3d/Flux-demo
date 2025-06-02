@@ -146,9 +146,8 @@ jobs:
           --set image.tag=${{ needs.version.outputs.docker_version }} \
           --set image.pullPolicy=IfNotPresent \
           --version ${{ needs.version.outputs.helm_version }} \
-          --debug --wait --timeout 1m
+          --debug --timeout 1m
         
-        kubectl get pods -o wide -w
   tag_repository:
     needs: version
     runs-on: ubuntu-latest
