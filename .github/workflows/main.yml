@@ -78,7 +78,7 @@ jobs:
       if: success() && github.event_name != 'pull_request'
       uses: aquasecurity/trivy-action@master
       with:
-        image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.extract_versions.outputs.docker_version }}
+        image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.version.outputs.docker_version }}
         format: 'sarif'
         exit-code: ${{ github.event_name == 'push' && '1' || '0' }}
         ignore-unfixed: true
