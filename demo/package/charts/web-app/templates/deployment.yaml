@@ -17,8 +17,7 @@ spec:
       # Pod-level security context
       {{- if .Values.podSecurityContext.enabled }}
       securityContext:
-        runAsUser: {{ .Values.podSecurityContext.runAsUser }}
-        runAsGroup: {{ .Values.podSecurityContext.runAsGroup }}
+        runAsNonRoot: true
         fsGroup: {{ .Values.podSecurityContext.fsGroup }}
       {{- end }}
 
@@ -33,11 +32,12 @@ spec:
           # Container security context
           {{- if .Values.containerSecurityContext.enabled }}
           securityContext:
-            readOnlyRootFilesystem: {{ .Values.containerSecurityContext.readOnlyRootFilesystem }}
-            allowPrivilegeEscalation: {{ .Values.containerSecurityContext.allowPrivilegeEscalation }}
+            runAsUser: 101  # Nginx user in alpine
+            runAsGroup: 101            
+            allowPrivilegeEscalation: false
             capabilities:
-              add: {{ toYaml .Values.containerSecurityContext.capabilities.add | nindent 14 }}
-              drop: {{ toYaml .Values.containerSecurityContext.capabilities.drop | nindent 14 }}
+              drop:
+                - ALL
           {{- end }}
           # Resource limits
           resources:
@@ -51,28 +51,34 @@ spec:
           livenessProbe:
             httpGet:
               path: /
-              port: 80
+              port: 8080
             initialDelaySeconds: {{ .Values.probes.livenessProbe.initialDelaySeconds }}
             periodSeconds: {{ .Values.probes.livenessProbe.periodSeconds }}
           readinessProbe:
             httpGet:
               path: /
-              port: 80
+              port: 8080
             initialDelaySeconds: {{ .Values.probes.readinessProbe.initialDelaySeconds }}
             periodSeconds: {{ .Values.probes.readinessProbe.periodSeconds }}
           ports:
-            - containerPort: 80
+            - containerPort: 8080
               protocol: TCP
           volumeMounts:
-            - name: config-volume
+            - name: nginx-config
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+            - name: nginx-config
               mountPath: /usr/share/nginx/html/index.html
               subPath: index.html
-              readOnly: true
             - name: tmp-volume
               mountPath: /tmp
+            - name: tmp-run
+              mountPath: /var/run
       volumes:
-        - name: config-volume
+        - name: nginx-config
           configMap:
             name: {{ include "web-app.fullname" . }}-config
         - name: tmp-volume
+          emptyDir: {}
+        - name: tmp-run
           emptyDir: {}

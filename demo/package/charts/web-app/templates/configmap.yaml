@@ -4,22 +4,44 @@ metadata:
   name: {{ include "web-app.fullname" . }}-config
 data:
   nginx.conf: |-
-    server {
-        listen 80;
-        server_name localhost;
+    worker_processes  auto;
 
-        location / {
-            return 200 '{{ .Values.nginx.configMap.message }}\n';
-            add_header Content-Type text/plain;
-        }
-
-        location /release/name {
-            return 200 '{{ .Release.Name }}\n';
-            add_header Content-Type text/plain;
-        }
-
-        location /release/revision {
-            return 200 '{{ .Release.Revision }}\n';
-            add_header Content-Type text/plain;
-        }
+    events {
+        worker_connections  1024;
     }
+    
+    http{
+      server {
+          listen 8080;
+          server_name localhost;
+
+          location / {
+            root /usr/share/nginx/html;
+            index index.html;
+          }
+
+          location /release/name {
+              return 200 '{{ .Release.Name }}\n' ;
+              add_header Content-Type text/plain;
+          }
+
+          location /release/revision {
+              return 200 '{{ .Release.Revision }}\n';
+              add_header Content-Type text/plain;
+          }
+      }
+    }
+  index.html: |-
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Welcome to {{ .Values.nginx.configMap.message }}</title>
+    </head>
+    <body>
+        <h1>Welcome to {{ .Values.nginx.configMap.message }} !</h1>
+        <p>This is a simple web server running on {{ .Values.nginx.configMap.stage }}.</p>
+    </body>
+    </html>
+

@@ -1,14 +1,21 @@
-FROM nginx:alpine
+FROM nginx:1.25-alpine
 
-# Minimal setup for port 80
-RUN rm /etc/nginx/conf.d/default.conf && \
-    chown -R nginx:nginx /var/cache/nginx
+# Remove default config and create writable temp directories
+RUN rm -rf /etc/nginx/conf.d/* && \
+    mkdir -p /var/cache/nginx/client_temp && \
+    chown -R nginx:nginx /var/cache/nginx && \
+    chmod -R 755 /var/cache/nginx
 
-# Run as nginx user (non-root)
+# Copy custom configuration and content
+COPY nginx.conf /etc/nginx/nginx.conf
+COPY index.html /usr/share/nginx/html/
+
+# Switch to non-root user and set permissions
 USER nginx
 
-# Expose standard HTTP port
-EXPOSE 80
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s \
+    CMD curl -f http://localhost/ || exit 1
 
-# Standard nginx start
-CMD ["nginx", "-g", "daemon off;"]
+EXPOSE 8080
+ENTRYPOINT ["nginx", "-g", "daemon off;"]
