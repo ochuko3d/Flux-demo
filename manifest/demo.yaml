@@ -7,7 +7,7 @@ spec:
   interval: 1m0s
   url: https://github.com/ochuko3d/Flux-demo
   ref:
-    tag: "1.0.0"
+    tag: v1.0.0
   timeout: 60s
 ---
 apiVersion: helm.toolkit.fluxcd.io/v2
@@ -16,10 +16,8 @@ metadata:
   name: web-app  
   namespace: flux-system
 spec:
-  dependsOn:
-    - name: logging-operator
-      namespace: vsds-logging
   interval: 5m
+  targetNamespace: prod
   chart:
     spec:
       chart: ./demo/package/charts/web-app  
