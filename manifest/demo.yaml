@@ -7,7 +7,7 @@ spec:
   interval: 1m0s
   url: https://github.com/ochuko3d/Flux-demo
   ref:
-    tag: "1.0.0"
+    tag: "v1.0.0"
   timeout: 60s
 ---
 apiVersion: helm.toolkit.fluxcd.io/v2
@@ -16,10 +16,8 @@ metadata:
   name: web-app  
   namespace: flux-system
 spec:
-  dependsOn:
-    - name: logging-operator
-      namespace: vsds-logging
   interval: 5m
+  targetNamespace: qa
   chart:
     spec:
       chart: ./demo/package/charts/web-app  
@@ -34,13 +32,13 @@ spec:
       retries: -1
     force: true
   values:
-    replicaCount: 2
+    replicaCount: 1
     nameOverride: "web-app"
     fullnameOverride: "web-app-chart"
     image:
       repository: ochuko3d/nginx-web-app  
-      tag: "1.0.0" 
+      tag: "v1.0.0" 
     nginx:
       configMap:
-        message: "ppro"
-        stage: "prod"            
+        message: "qa"
+        stage: "qa"            
