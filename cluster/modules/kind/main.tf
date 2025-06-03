@@ -99,7 +99,7 @@ resource "flux_bootstrap_git" "this" {
   count = var.enabled ? 1 : 0
   depends_on = [
     kubernetes_namespace.this,
-    kind_cluster.this[0],time_sleep.wait_for_cluster
+    kind_cluster.this[0]
   ]
 
   embedded_manifests = true
@@ -107,8 +107,3 @@ resource "flux_bootstrap_git" "this" {
   components_extra   = ["image-reflector-controller", "image-automation-controller"]
 }
 
-resource "time_sleep" "wait_for_cluster" {
-  count = var.enabled ? 1 : 0
-  depends_on = [kind_cluster.this]
-  create_duration = "50s"
-}
