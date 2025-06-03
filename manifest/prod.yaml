@@ -4,7 +4,7 @@ metadata:
   name: demo
 spec:
   interval: 5m
-  path: ./manifest
+  path: ./manifest/demo.yaml
   force: true
   prune: true
   sourceRef:
