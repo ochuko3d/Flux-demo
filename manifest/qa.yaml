@@ -7,6 +7,9 @@ spec:
   path: ./manifest/demo
   force: true
   prune: true
+  destroy: true
+  wait: true
+  timeout: 2m
   sourceRef:
     kind: GitRepository
     name: flux-system
