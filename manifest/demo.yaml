@@ -1,0 +1,46 @@
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: demo
+  namespace: flux-system
+spec:
+  interval: 1m0s
+  url: https://github.com/ochuko3d/Flux-demo
+  ref:
+    tag: "1.0.0"
+  timeout: 60s
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: web-app  
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: logging-operator
+      namespace: vsds-logging
+  interval: 5m
+  chart:
+    spec:
+      chart: ./demo/package/charts/web-app  
+      sourceRef:
+        kind: GitRepository
+        name: demo
+  install:
+    remediation:
+      retries: -1
+  upgrade:
+    remediation:
+      retries: -1
+    force: true
+  values:
+    replicaCount: 2
+    nameOverride: "web-app"
+    fullnameOverride: "web-app-chart"
+    image:
+      repository: ochuko3d/nginx-web-app  
+      tag: "1.0.0" 
+    nginx:
+      configMap:
+        message: "ppro"
+        stage: "prod"            
