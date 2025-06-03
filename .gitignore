@@ -3,3 +3,8 @@
 *.tfstate.backup
 *.tfvars
 .terraform.lock.hcl
+cluster/qa-cluster-stage-config
+cluster/prod-cluster-stage-config
+cluster/qa-cluster-stage-config
+cluster/terraform.tfstate
+cluster/terraform.tfstate.backup
