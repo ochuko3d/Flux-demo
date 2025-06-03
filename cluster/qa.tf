@@ -1,5 +1,5 @@
 module "qa" {
-  source              = "../../modules/kind"
+  source              = "./modules/kind"
   cluster_name        = "qa-cluster"
   github_org          = "ochuko3d"
   github_repository   = "flux-demo"

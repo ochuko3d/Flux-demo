@@ -1,5 +1,5 @@
 module "prod" {
-  source              = "../../modules/kind"
+  source              = "./modules/kind"
   cluster_name        = "prod-cluster"
   github_org          = "ochuko3d"
   github_repository   = "flux-demo"
