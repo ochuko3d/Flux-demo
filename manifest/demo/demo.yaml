@@ -17,7 +17,7 @@ metadata:
   namespace: flux-system
 spec:
   interval: 5m
-  targetNamespace: qa
+  targetNamespace: qa-web-app
   chart:
     spec:
       chart: ./demo/package/charts/web-app  
